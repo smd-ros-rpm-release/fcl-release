@@ -106,8 +106,13 @@ install(DIRECTORY include/ DESTINATION include
   PATTERN ".DS_Store" EXCLUDE
 )
 
-install(FILES "${pkg_conf_file}" DESTINATION lib/pkgconfig/ COMPONENT pkgconfig)
+find_package(catkin)
+catkin_package(
+  LIBRARIES ${PROJECT_NAME}
+)
+
+#install(FILES "${pkg_conf_file}" DESTINATION lib/pkgconfig/ COMPONENT pkgconfig)
 
 
-enable_testing()
-add_subdirectory(test)
+#enable_testing()
+#add_subdirectory(test)
