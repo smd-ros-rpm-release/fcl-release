@@ -1,0 +1,33 @@
+From 6246e882c45b06a8a12f78ecc9091726d2ad6c2d Mon Sep 17 00:00:00 2001
+From: Ioan Sucan <isucan@willowgarage.com>
+Date: Sat, 9 Mar 2013 14:48:10 -0800
+Subject: [PATCH] added catkin specific commands to build system
+
+---
+ CMakeLists.txt |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 96c7ea6..c8f7131 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -106,8 +106,13 @@ install(DIRECTORY include/ DESTINATION include
+   PATTERN ".DS_Store" EXCLUDE
+ )
+ 
+-install(FILES "${pkg_conf_file}" DESTINATION lib/pkgconfig/ COMPONENT pkgconfig)
++find_package(catkin)
++catkin_package(
++  LIBRARIES ${PROJECT_NAME}
++)
++
++#install(FILES "${pkg_conf_file}" DESTINATION lib/pkgconfig/ COMPONENT pkgconfig)
+ 
+ 
+-enable_testing()
+-add_subdirectory(test)
++#enable_testing()
++#add_subdirectory(test)
+-- 
+1.7.9.5
+
