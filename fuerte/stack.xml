@@ -7,6 +7,7 @@
   <license>BSD</license>
 
   <url>http://gamma.cs.unc.edu/FCL/</url>
+  <copyright>The Devs</copyright>
 
   <build_depends>catkin</build_depends>
   <build_depends>pkg-config</build_depends>
