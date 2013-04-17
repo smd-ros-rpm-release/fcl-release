@@ -1,7 +1,7 @@
-From 6246e882c45b06a8a12f78ecc9091726d2ad6c2d Mon Sep 17 00:00:00 2001
+From 2193a01d1927aad8e2526cdd6b8fbe8364da97aa Mon Sep 17 00:00:00 2001
 From: Ioan Sucan <isucan@willowgarage.com>
 Date: Sat, 9 Mar 2013 14:48:10 -0800
-Subject: [PATCH] added catkin specific commands to build system
+Subject: [PATCH 1/2] added catkin specific commands to build system
 
 ---
  CMakeLists.txt |   11 ++++++++---
