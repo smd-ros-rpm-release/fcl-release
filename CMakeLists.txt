@@ -108,6 +108,7 @@ install(DIRECTORY include/ DESTINATION include
 
 find_package(catkin)
 catkin_package(
+  INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
 )
 
