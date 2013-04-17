@@ -1,0 +1,12 @@
+Source: ros-hydro-fcl
+Section: misc
+Priority: extra
+Maintainer: Ioan Sucan <isucan@willowgarage.com>
+Build-Depends: debhelper (>= 7.0.50~), libboost-all-dev, pkg-config, ros-hydro-catkin, ros-hydro-libccd, ros-hydro-octomap
+Homepage: http://gamma.cs.unc.edu/FCL/
+Standards-Version: 3.9.2
+
+Package: ros-hydro-fcl
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libboost-all-dev, ros-hydro-libccd, ros-hydro-octomap
+Description: FCL is a collision checking library
