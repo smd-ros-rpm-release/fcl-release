@@ -1,12 +1,12 @@
 if(CMAKE_COMPILER_IS_GNUCXX)
-    add_definitions(-W -Wall -Wextra -Wno-missing-field-initializers -Wno-unused-parameter)
+    add_definitions(-W -Wall -g -Wextra -Wno-missing-field-initializers -Wno-unused-parameter)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     add_definitions(-W -Wall -Wextra -Wno-missing-field-initializers -Wno-unused-parameter -Wno-delete-non-virtual-dtor -Wno-overloaded-virtual -Wno-unknown-pragmas)
 endif()
 
 if(MSVC OR MSVC90 OR MSVC10)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MP /W1 /D_ITERATOR_DEBUG_LEVEL=0")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /MP /W1")
 endif(MSVC OR MSVC90 OR MSVC10)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")

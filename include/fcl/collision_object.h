@@ -38,6 +38,7 @@
 #ifndef FCL_COLLISION_OBJECT_BASE_H
 #define FCL_COLLISION_OBJECT_BASE_H
 
+#include <fcl/deprecated.h>
 #include "fcl/BV/AABB.h"
 #include "fcl/math/transform.h"
 #include "fcl/ccd/motion_base.h"
@@ -115,6 +116,34 @@ public:
 
   /// @brief threshold for free (<= is free)
   FCL_REAL threshold_free;
+
+  /// @brief compute center of mass
+  virtual Vec3f computeCOM() const { return Vec3f(); }
+
+  /// @brief compute the inertia matrix, related to the origin
+  virtual Matrix3f computeMomentofInertia() const { return Matrix3f(); }
+
+  /// @brief compute the volume
+  virtual FCL_REAL computeVolume() const { return 0; }
+
+  /// @brief compute the inertia matrix, related to the com
+  virtual Matrix3f computeMomentofInertiaRelatedToCOM() const
+  {
+    Matrix3f C = computeMomentofInertia();
+    Vec3f com = computeCOM();
+    FCL_REAL V = computeVolume();
+
+    return Matrix3f(C(0, 0) - V * (com[1] * com[1] + com[2] * com[2]),
+                    C(0, 1) + V * com[0] * com[1],
+                    C(0, 2) + V * com[0] * com[2],
+                    C(1, 0) + V * com[1] * com[0],
+                    C(1, 1) - V * (com[0] * com[0] + com[2] * com[2]),
+                    C(1, 2) + V * com[1] * com[2],
+                    C(2, 0) + V * com[2] * com[0],
+                    C(2, 1) + V * com[2] * com[1],
+                    C(2, 2) - V * (com[0] * com[0] + com[1] * com[1]));
+  }
+
 };
 
 /// @brief the object for collision or distance computation, contains the geometry and the transform information
@@ -267,9 +296,15 @@ public:
   }
 
   /// @brief get geometry from the object instance
-  const CollisionGeometry* getCollisionGeometry() const
+  const CollisionGeometry* getCollisionGeometry() const FCL_DEPRECATED
   {
     return cgeom.get();
+  }
+
+  /// @brief get geometry from the object instance
+  boost::shared_ptr<const CollisionGeometry> collisionGeometry() const
+  {
+    return cgeom;
   }
 
   /// @brief get object's cost density
@@ -409,9 +444,15 @@ public:
   }
 
   /// @brief get geometry from the object instance
-  inline const CollisionGeometry* getCollisionGeometry() const
+  inline const CollisionGeometry* getCollisionGeometry() const FCL_DEPRECATED
   {
     return cgeom.get();
+  }
+
+  /// @brief get geometry from the object instance
+  inline boost::shared_ptr<const CollisionGeometry> collisionGeometry() const
+  {
+    return cgeom;
   }
 
 protected:

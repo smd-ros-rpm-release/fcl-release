@@ -41,6 +41,7 @@
 #include "fcl/narrowphase/narrowphase.h"
 #include "fcl/collision.h"
 #include "test_fcl_utility.h"
+#include "fcl/ccd/motion.h"
 #include <iostream>
 
 using namespace fcl;
@@ -51,6 +52,66 @@ GJKSolver_libccd solver1;
 GJKSolver_indep solver2;
 
 #define BOOST_CHECK_FALSE(p) BOOST_CHECK(!(p))
+
+BOOST_AUTO_TEST_CASE(gjkcache)
+{
+  Cylinder s1(5, 10);
+  Cone s2(5, 10);
+
+  CollisionRequest request;
+  request.enable_cached_gjk_guess = true;
+  request.gjk_solver_type = GST_INDEP;
+
+  TranslationMotion motion(Transform3f(Vec3f(-20.0, -20.0, -20.0)), Transform3f(Vec3f(20.0, 20.0, 20.0)));
+
+  int N = 1000;  
+  FCL_REAL dt = 1.0 / (N - 1);
+
+  /// test exploiting spatial coherence
+  Timer timer1;
+  timer1.start();
+  std::vector<bool> result1(N);
+  for(int i = 0; i < N; ++i)
+  {
+    motion.integrate(dt * i);
+    Transform3f tf;
+    motion.getCurrentTransform(tf);
+
+    CollisionResult result;
+
+    collide(&s1, Transform3f(), &s2, tf, request, result);
+    result1[i] = result.isCollision();
+    request.cached_gjk_guess = result.cached_gjk_guess; // use cached guess
+  }
+
+  timer1.stop();
+
+  /// test without exploiting spatial coherence
+  Timer timer2;
+  timer2.start();
+  std::vector<bool> result2(N);
+  request.enable_cached_gjk_guess = false;
+  for(int i = 0; i < N; ++i)
+  {
+    motion.integrate(dt * i);
+    Transform3f tf;
+    motion.getCurrentTransform(tf);
+
+    CollisionResult result;
+
+    collide(&s1, Transform3f(), &s2, tf, request, result);
+    result2[i] = result.isCollision();
+  }
+
+  timer2.stop();
+
+  std::cout << timer1.getElapsedTime() << " " << timer2.getElapsedTime() << std::endl;
+
+  for(std::size_t i = 0; i < result1.size(); ++i)
+  {
+    BOOST_CHECK(result1[i] == result2[i]);
+  }
+}
 
 BOOST_AUTO_TEST_CASE(shapeIntersection_spheresphere)
 {
@@ -68,73 +129,73 @@ BOOST_AUTO_TEST_CASE(shapeIntersection_spheresphere)
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(40, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(40, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(40, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(40, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(40, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(40, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(30, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(30, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(30, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(30.01, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(30.01, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(30.01, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(29.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(29.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(29.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(29.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform, NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform, &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform, request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(-29.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-29.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(-29.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-29.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(-30, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-30, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-30, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(-30.01, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-30.01, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-30.01, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 }
 
@@ -155,25 +216,25 @@ BOOST_AUTO_TEST_CASE(shapeIntersection_boxbox)
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform, NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform, &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform, request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(15, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(15, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(15, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(15.01, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(15.01, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(15.01, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   Quaternion3f q;
@@ -181,13 +242,13 @@ BOOST_AUTO_TEST_CASE(shapeIntersection_boxbox)
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(q), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(q), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(q), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(q), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(q), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(q), request, result) > 0);
   BOOST_CHECK(res);
 }
 
@@ -208,38 +269,38 @@ BOOST_AUTO_TEST_CASE(shapeIntersection_spherebox)
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform, NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform, &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform, request, result) > 0);
   BOOST_CHECK(res);
 
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(22.5, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(22.5, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(22.5, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(22.501, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(22.501, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(22.501, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(22.4, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(22.4, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(22.4, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(22.4, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(22.4, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(22.4, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 }
 
@@ -260,37 +321,37 @@ BOOST_AUTO_TEST_CASE(shapeIntersection_cylindercylinder)
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform, NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform, &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform, request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(9.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(9.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(9.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(9.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(9.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(9.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(10, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(10, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(10, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(10.01, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(10.01, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(10.01, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 }
 
@@ -311,49 +372,49 @@ BOOST_AUTO_TEST_CASE(shapeIntersection_conecone)
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform, NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform, &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform, request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(9.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(9.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(9.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(9.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(9.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(9.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(10.001, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(10.001, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(10.001, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(10.001, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(10.001, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(10.001, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(0, 0, 9.9)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(0, 0, 9.9)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(0, 0, 9.9)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(0, 0, 9.9)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(0, 0, 9.9)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(0, 0, 9.9)), request, result) > 0);
   BOOST_CHECK(res);
 }
 
@@ -374,61 +435,61 @@ BOOST_AUTO_TEST_CASE(shapeIntersection_conecylinder)
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform, NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform, &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform, request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(9.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(9.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(9.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(9.9, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(9.9, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(9.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(10.01, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(10, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(10, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(10.01, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(10.01, 0, 0)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(10.01, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(0, 0, 9.9)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(0, 0, 9.9)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(0, 0, 9.9)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(0, 0, 9.9)), NULL, NULL, NULL);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(0, 0, 9.9)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(0, 0, 9.9)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver1.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(0, 0, 10.01)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(0, 0, 10)), &solver1, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(0, 0, 10)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver1.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(0, 0, 10.01)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(0, 0, 10.01)), &solver1, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(0, 0, 10.01)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 }
 
@@ -1801,12 +1862,12 @@ BOOST_AUTO_TEST_CASE(shapeDistance_spheresphere)
   Sphere s2(10);
 
   Transform3f transform;
-  generateRandomTransform(extents, transform);
+  //generateRandomTransform(extents, transform);
 
   bool res;
   FCL_REAL dist = -1;
-  
-  res = solver1.shapeDistance(s1, Transform3f(), s2, Transform3f(Vec3f(40, 0, 0)), &dist);
+  Vec3f closest_p1, closest_p2;
+  res = solver1.shapeDistance(s1, Transform3f(), s2, Transform3f(Vec3f(0, 40, 0)), &dist, &closest_p1, &closest_p2);
   BOOST_CHECK(fabs(dist - 10) < 0.001);
   BOOST_CHECK(res);
 
@@ -1861,9 +1922,10 @@ BOOST_AUTO_TEST_CASE(shapeDistance_boxbox)
 {                      
   Box s1(20, 40, 50);
   Box s2(10, 10, 10);
+  Vec3f closest_p1, closest_p2;
 
   Transform3f transform;
-  generateRandomTransform(extents, transform);
+  //generateRandomTransform(extents, transform);
 
   bool res;
   FCL_REAL dist;
@@ -1876,9 +1938,43 @@ BOOST_AUTO_TEST_CASE(shapeDistance_boxbox)
   BOOST_CHECK(dist < 0);
   BOOST_CHECK_FALSE(res);
 
-  res = solver1.shapeDistance(s1, Transform3f(), s2, Transform3f(Vec3f(15.1, 0, 0)), &dist);
+  std::cerr << " SOVLER NUMBER 1" << std::endl;
+  res = solver1.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(10.1, 0, 0)), &dist, &closest_p1, &closest_p2);
+  std::cerr << "computed points in box to box" << closest_p1 << " & " << closest_p2 << "with dist: " << dist<< std::endl;
   BOOST_CHECK(fabs(dist - 0.1) < 0.001);
   BOOST_CHECK(res);
+
+  res = solver1.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(20.1, 0, 0)), &dist, &closest_p1, &closest_p2);
+  std::cerr << "computed points in box to box" << closest_p1 << " & " << closest_p2 << "with dist: " << dist<< std::endl;
+  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
+  BOOST_CHECK(res);
+
+  res = solver1.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(0, 20.2, 0)), &dist, &closest_p1, &closest_p2);
+  std::cerr << "computed points in box to box" << closest_p1 << " & " << closest_p2 << "with dist: " << dist<< std::endl;
+  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
+  BOOST_CHECK(res);
+
+  res = solver1.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(10.1, 10.1, 0)), &dist, &closest_p1, &closest_p2);
+  std::cerr << "computed points in box to box" << closest_p1 << " & " << closest_p2 << "with dist: " << dist<< std::endl;
+  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
+  BOOST_CHECK(res);
+
+  res = solver2.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(10.1, 0, 0)), &dist, &closest_p1, &closest_p2);
+  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
+  BOOST_CHECK(res);
+
+  res = solver2.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(20.1, 0, 0)), &dist, &closest_p1, &closest_p2);
+  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
+  BOOST_CHECK(res);
+
+  res = solver2.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(0, 20.1, 0)), &dist, &closest_p1, &closest_p2);
+  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
+  BOOST_CHECK(res);
+
+  res = solver2.shapeDistance(s2, Transform3f(), s2, Transform3f(Vec3f(10.1, 10.1, 0)), &dist, &closest_p1, &closest_p2);
+  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
+  BOOST_CHECK(res);
+
 
   res = solver1.shapeDistance(s1, transform, s2, transform * Transform3f(Vec3f(15.1, 0, 0)), &dist);
   BOOST_CHECK(fabs(dist - 0.1) < 0.001);
@@ -2057,12 +2153,14 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   Vec3f normal;  
   bool res;
 
+  request.gjk_solver_type = GST_INDEP; // use indep GJK solver
+
   res = solver2.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(40, 0, 0)), NULL, NULL, NULL);
   BOOST_CHECK_FALSE(res); 
   res = solver2.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(40, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(40, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(40, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
   res = solver2.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(40, 0, 0)), NULL, NULL, NULL);
@@ -2070,7 +2168,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(40, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(40, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(40, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
 
@@ -2079,7 +2177,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(30, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(30, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(30, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
 
@@ -2088,7 +2186,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(30.01, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(30.01, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(30.01, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 
 
@@ -2097,7 +2195,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(29.9, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(29.9, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
 
@@ -2106,7 +2204,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(29.9, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(29.9, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
 
@@ -2115,7 +2213,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, Transform3f(), s2, Transform3f(), &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(), &solver2, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(), request, result) > 0);
   BOOST_CHECK(res);
 
 
@@ -2124,7 +2222,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, transform, s2, transform, &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform, &solver2, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform, request, result) > 0);
   BOOST_CHECK(res);
 
 
@@ -2133,7 +2231,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(-29.9, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-29.9, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
 
@@ -2143,7 +2241,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(-29.9, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-29.9, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-29.9, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
 
@@ -2152,7 +2250,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, Transform3f(), s2, Transform3f(Vec3f(-30, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK(res);
   result.clear();
-  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-30, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, Transform3f(), &s2, Transform3f(Vec3f(-30, 0, 0)), request, result) > 0);
   BOOST_CHECK(res);
 
   res = solver2.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(-30.01, 0, 0)), NULL, NULL, NULL);
@@ -2160,7 +2258,7 @@ BOOST_AUTO_TEST_CASE(shapeIntersectionGJK_spheresphere)
   res = solver2.shapeIntersect(s1, transform, s2, transform * Transform3f(Vec3f(-30.01, 0, 0)), &contact, &penetration_depth, &normal);
   BOOST_CHECK_FALSE(res);
   result.clear();
-  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-30.01, 0, 0)), &solver2, request, result) > 0);
+  res = (collide(&s1, transform, &s2, transform * Transform3f(Vec3f(-30.01, 0, 0)), request, result) > 0);
   BOOST_CHECK_FALSE(res);
 }
 
@@ -2656,40 +2754,6 @@ BOOST_AUTO_TEST_CASE(conecone)
   BOOST_CHECK(res);
 }
 
-BOOST_AUTO_TEST_CASE(conecylinder)
-{
-  Cylinder s1(5, 10);
-  Cone s2(5, 10);
 
-  Transform3f transform;
-  generateRandomTransform(extents, transform);
-
-  bool res;
-  FCL_REAL dist;
-
-  res = solver2.shapeDistance(s1, Transform3f(), s2, Transform3f(), &dist);
-  BOOST_CHECK(dist < 0);
-  BOOST_CHECK_FALSE(res);
-
-  res = solver2.shapeDistance(s1, transform, s2, transform, &dist);
-  BOOST_CHECK(dist < 0);
-  BOOST_CHECK_FALSE(res);
-
-  res = solver2.shapeDistance(s1, Transform3f(), s2, Transform3f(Vec3f(10.1, 0, 0)), &dist);
-  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
-  BOOST_CHECK(res);
-
-  res = solver2.shapeDistance(s1, transform, s2, transform * Transform3f(Vec3f(10.1, 0, 0)), &dist);
-  BOOST_CHECK(fabs(dist - 0.1) < 0.001);
-  BOOST_CHECK(res);
-
-  res = solver2.shapeDistance(s1, Transform3f(), s2, Transform3f(Vec3f(40, 0, 0)), &dist);
-  BOOST_CHECK(fabs(dist - 30) < 0.001);
-  BOOST_CHECK(res);
-
-  res = solver2.shapeDistance(s1, transform, s2, transform * Transform3f(Vec3f(40, 0, 0)), &dist);
-  BOOST_CHECK(fabs(dist - 30) < 0.001);
-  BOOST_CHECK(res);
-}
 
 
