@@ -65,22 +65,21 @@ find_package(flann QUIET)
 if (FLANN_FOUND)
   set(FCL_HAVE_FLANN 1)
   include_directories(${FLANN_INCLUDE_DIRS})
-  link_directories(${FLANN_LIBRARY_DIRS})
   message(STATUS "FCL uses Flann")
 else()
   message(STATUS "FCL does not use Flann")
 endif()
 
 
-find_package(tinyxml QUIET)
-if (TINYXML_FOUND)
-  set(FCL_HAVE_TINYXML 1)
-  include_directories(${TINYXML_INCLUDE_DIRS})
-  link_directories(${TINYXML_LIBRARY_DIRS})
-  message(STATUS "FCL uses tinyxml")
-else()
-  message(STATUS "FCL does not use tinyxml")
-endif()
+# find_package(tinyxml QUIET)
+# if (TINYXML_FOUND)
+#   set(FCL_HAVE_TINYXML 1)
+#   include_directories(${TINYXML_INCLUDE_DIRS})
+#   link_directories(${TINYXML_LIBRARY_DIRS})
+#   message(STATUS "FCL uses tinyxml")
+# else()
+#   message(STATUS "FCL does not use tinyxml")
+# endif()
 
 
 find_package(Boost COMPONENTS thread date_time filesystem system unit_test_framework REQUIRED)
@@ -129,14 +128,8 @@ install(DIRECTORY include/ DESTINATION include
   PATTERN ".DS_Store" EXCLUDE
 )
 
-find_package(catkin)
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
-  )
-
-#install(FILES "${pkg_conf_file}" DESTINATION lib/pkgconfig/ COMPONENT pkgconfig)
+install(FILES "${pkg_conf_file}" DESTINATION lib/pkgconfig/ COMPONENT pkgconfig)
 
 
-#enable_testing()
-#add_subdirectory(test)
+enable_testing()
+add_subdirectory(test)
